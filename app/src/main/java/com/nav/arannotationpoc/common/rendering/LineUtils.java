@@ -74,31 +74,39 @@ public class LineUtils {
     }
 
     public static Vector3f GetWorldCoords2(Vector2f touchPoint, float screenWidth, float screenHeight, float[] projectionMatrix, float[] viewMatrix,Vector3f planePosition, Vector3f planeNormal) {
+        // Project the ray from the screen touch point
         Ray touchRay = projectRay(touchPoint, screenWidth, screenHeight, projectionMatrix, viewMatrix);
 
-        // Calculate intersection of the ray with the plane
+        // Check if touchRay or planePosition is null
+        if (touchRay.origin == null || planePosition == null) {
+            // Log an error and return null
+            System.err.println("GetWorldCoords: Null reference encountered - touchRay or planePosition is null.");
+            return null;
+        }
+
+        // Calculate the intersection of the ray with the specified plane
         Vector3f rayOrigin = touchRay.origin;
         Vector3f rayDirection = touchRay.direction;
 
-        // Calculate dot product between the ray direction and plane normal
+        // Calculate dot product between ray direction and plane normal
         float denom = planeNormal.dot(rayDirection);
 
-        // Check if the ray is parallel to the plane
-        if (Math.abs(denom) > 1e-6) { // Tolerance for floating-point precision
+        // Check if the ray is not parallel to the plane
+        if (Math.abs(denom) > 1e-6) { // Avoid division by zero
             Vector3f originToPlane = new Vector3f();
             originToPlane.sub(planePosition, rayOrigin); // Vector from ray origin to plane position
             float t = originToPlane.dot(planeNormal) / denom;
 
-            // Calculate intersection point if t is positive (the ray is in the direction of the plane)
+            // Only calculate if the intersection is in the positive direction of the ray
             if (t >= 0) {
                 Vector3f intersectionPoint = new Vector3f(rayDirection);
                 intersectionPoint.scale(t);
                 intersectionPoint.add(rayOrigin);
-                return intersectionPoint; // Return the point on the detected plane
+                return intersectionPoint; // Return point on the plane
             }
         }
 
-        // If no intersection, return null or some fallback point (optional)
+        // If there's no intersection, return null or a fallback point
         return null;
     }
 

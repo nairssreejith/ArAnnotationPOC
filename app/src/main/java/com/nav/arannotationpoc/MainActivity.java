@@ -3,66 +3,45 @@ package com.nav.arannotationpoc;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.graphics.Path;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
-import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
 import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
-import androidx.core.graphics.Insets;
-import androidx.core.view.GestureDetectorCompat;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.snackbar.Snackbar;
-import com.google.ar.core.Anchor;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.Camera;
 import com.google.ar.core.Config;
 
-import com.google.ar.core.Coordinates2d;
 import com.google.ar.core.Frame;
-import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
-import com.google.ar.core.Point;
-import com.google.ar.core.Pose;
 import com.google.ar.core.Session;
-import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
-import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
-import com.nav.arannotationpoc.common.drawing.DrawingView;
 import com.nav.arannotationpoc.common.helpers.AppSettings;
 import com.nav.arannotationpoc.common.helpers.BiquadFilter;
 import com.nav.arannotationpoc.common.helpers.CameraPermissionHelper;
 import com.nav.arannotationpoc.common.helpers.DisplayRotationHelper;
-import com.nav.arannotationpoc.common.helpers.FullScreenHelper;
-import com.nav.arannotationpoc.common.helpers.PathConverter;
-import com.nav.arannotationpoc.common.helpers.ScreenshotHelper;
-import com.nav.arannotationpoc.common.helpers.SnackbarHelper;
-import com.nav.arannotationpoc.common.helpers.TapHelper;
-import com.nav.arannotationpoc.common.helpers.TrackingStateHelper;
+import com.nav.arannotationpoc.common.viewmodel.ScreenshotViewModel;
 import com.nav.arannotationpoc.common.rendering.BackgroundRenderer;
 import com.nav.arannotationpoc.common.rendering.LineShaderRenderer;
 import com.nav.arannotationpoc.common.rendering.LineUtils;
@@ -70,10 +49,6 @@ import com.nav.arannotationpoc.common.rendering.LineUtils;
 
 import android.util.DisplayMetrics;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -91,8 +66,8 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
 
     private GLSurfaceView mSurfaceView;
     private final List<Plane> trackedPlanes = new ArrayList<>();
-    Vector3f planePosition;
-    Vector3f planeNormal;
+
+    private ScreenshotViewModel screenshotViewModel;
 
     private Config mDefaultConfig;
     private Session mSession;
@@ -108,6 +83,12 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
 
     private float mScreenWidth = 0;
     private float mScreenHeight = 0;
+
+    Vector2f touchPoint = new Vector2f(100, 200); // Example screen touch point
+
+    // Define the background plane
+    Vector3f planePosition = new Vector3f(0, 0, 0); // Position of the plane at z=0
+    Vector3f planeNormal = new Vector3f(0, 0, 1);   // Normal vector of the plane
 
     private BiquadFilter biquadFilter;
     private Vector3f mLastPoint;
@@ -216,6 +197,7 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
 
         bInstallRequested = false;
 
+
         // Set up renderer.
         mSurfaceView.setPreserveEGLContextOnPause(true);
         mSurfaceView.setEGLContextClientVersion(2);
@@ -228,6 +210,13 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
         mDetector.setOnDoubleTapListener(this);
         mStrokes = new ArrayList<>();
 
+        // Initialize ViewModel
+        screenshotViewModel = new ViewModelProvider(this).get(ScreenshotViewModel.class);
+
+        // Observe LiveData for save status
+        screenshotViewModel.getSaveStatusLiveData().observe(this, status -> {
+            Toast.makeText(this, status, Toast.LENGTH_SHORT).show();
+        });
 
     }
 
@@ -338,6 +327,8 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
             if (!mSession.isSupported(config)) {
                 Log.e(TAG, "Exception creating session Device Does Not Support ARCore", exception);
             }
+            config.setDepthMode(Config.DepthMode.AUTOMATIC);
+            config.setFocusMode(Config.FocusMode.AUTO);
             mSession.configure(config);
         }
         // Note that order matters - see the note in onPause(), the reverse applies here.
@@ -686,7 +677,10 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
 
 
     public void onClickCapture(View view) {
-        ScreenshotHelper.takeScreenshot(this, mSurfaceView, mButtonBar, "Screenshots");
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            mSurfaceView.queueEvent(() -> screenshotViewModel.takeScreenshot(this, mSurfaceView, "Screenshots"));
+        }, 100);
+       //screenshotViewModel.takeScreenshot(this, mSurfaceView, "Screenshots");
     }
 
     // ------- Touch events
