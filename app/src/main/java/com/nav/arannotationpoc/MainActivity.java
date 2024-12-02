@@ -1,8 +1,10 @@
 package com.nav.arannotationpoc;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
@@ -21,6 +23,8 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.snackbar.Snackbar;
@@ -227,9 +231,18 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
      * @param touchPoint a 2D point in screen space and is projected into 3D world space
      */
     private void addStroke(Vector2f touchPoint) {
-        //Vector3f newPoint = LineUtils.GetWorldCoords2(touchPoint, mScreenWidth, mScreenHeight, projmtx, viewmtx, planePosition, planeNormal);
+        /*List<Vector3f> newPoints = LineUtils.GetWorldCoords2(touchPoint, mScreenWidth, mScreenHeight, projmtx, viewmtx, planePosition, planeNormal);
+        if (newPoints != null) {
+            for (Vector3f point : newPoints) {
+                // Convert Vector3f points to OpenGL vertices and render as line segments
+                addStroke(point);
+            }
+        }*/
+
         Vector3f newPoint = LineUtils.GetWorldCoords(touchPoint, mScreenWidth, mScreenHeight, projmtx, viewmtx);
         addStroke(newPoint);
+
+
     }
 
 
@@ -239,9 +252,17 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
      * @param touchPoint a 2D point in screen space and is projected into 3D world space
      */
     private void addPoint(Vector2f touchPoint) {
-        //Vector3f newPoint = LineUtils.GetWorldCoords2(touchPoint, mScreenWidth, mScreenHeight, projmtx, viewmtx, planePosition,planeNormal);
+        /*List<Vector3f> newPoints = LineUtils.GetWorldCoords2(touchPoint, mScreenWidth, mScreenHeight, projmtx, viewmtx, planePosition,planeNormal);
+        if (newPoints != null) {
+            for (Vector3f point : newPoints) {
+                // Convert Vector3f points to OpenGL vertices and render as line segments
+                addPoint(point);
+            }
+        }*/
+
         Vector3f newPoint = LineUtils.GetWorldCoords(touchPoint, mScreenWidth, mScreenHeight, projmtx, viewmtx);
         addPoint(newPoint);
+
     }
 
 
@@ -281,6 +302,8 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
     @Override
     protected void onResume() {
         super.onResume();
+
+
 
         if (mSession == null) {
             Exception exception = null;
@@ -460,10 +483,13 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
             for (Plane plane : updatedPlanes) {
                 // Process only actively tracked planes
                 if (plane.getTrackingState() == TrackingState.TRACKING) {
+                    Log.d("PLANETRACK", "Plane is being tracked");
                     // Check if the plane is already in the tracked list
                     if (!trackedPlanes.contains(plane)) {
                         // New plane detected, add it to trackedPlanes
                         trackedPlanes.add(plane);
+
+                        Log.d("PLANETRACK", "Plane tracked is added for processing");
                         processPlane(plane); // Perform any processing for this new plane
                     }
                 } else if (plane.getTrackingState() == TrackingState.STOPPED) {

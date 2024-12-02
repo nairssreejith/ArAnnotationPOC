@@ -19,6 +19,9 @@ import android.opengl.Matrix;
 
 import com.nav.arannotationpoc.common.helpers.AppSettings;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import javax.vecmath.Vector2f;
 import javax.vecmath.Vector3f;
 
@@ -73,40 +76,63 @@ public class LineUtils {
         return touchRay.origin;
     }
 
-    public static Vector3f GetWorldCoords2(Vector2f touchPoint, float screenWidth, float screenHeight, float[] projectionMatrix, float[] viewMatrix,Vector3f planePosition, Vector3f planeNormal) {
-        // Project the ray from the screen touch point
+    // Assume 'projectionMatrix' is a float array containing the 4x4 matrix values
+
+    private static float getFarClipDistance(float[] projectionMatrix) {
+        // Assuming the projectionMatrix is a 16-element 1D float array (4x4 matrix flattened)
+
+        // Perspective projection matrix typically has the far clip distance in this position
+        // In a typical matrix format:
+        // projectionMatrix[10] is usually the near plane depth (or other projection values)
+        // projectionMatrix[14] contains the far plane distance
+        return projectionMatrix[14];
+    }
+
+    public static List<Vector3f> GetWorldCoords2(
+            Vector2f touchPoint, float screenWidth, float screenHeight,
+            float[] projectionMatrix, float[] viewMatrix,
+            Vector3f planePosition, Vector3f planeNormal) {
+
+        // Project the ray from the touch point
         Ray touchRay = projectRay(touchPoint, screenWidth, screenHeight, projectionMatrix, viewMatrix);
 
-        // Check if touchRay or planePosition is null
         if (touchRay.origin == null || planePosition == null) {
-            // Log an error and return null
             System.err.println("GetWorldCoords: Null reference encountered - touchRay or planePosition is null.");
             return null;
         }
 
-        // Calculate the intersection of the ray with the specified plane
         Vector3f rayOrigin = touchRay.origin;
         Vector3f rayDirection = touchRay.direction;
 
-        // Calculate dot product between ray direction and plane normal
+        // Calculate the intersection of the ray with the specified plane
         float denom = planeNormal.dot(rayDirection);
 
-        // Check if the ray is not parallel to the plane
-        if (Math.abs(denom) > 1e-6) { // Avoid division by zero
+        if (Math.abs(denom) > 1e-6) { // Check if ray is not parallel to the plane
             Vector3f originToPlane = new Vector3f();
             originToPlane.sub(planePosition, rayOrigin); // Vector from ray origin to plane position
             float t = originToPlane.dot(planeNormal) / denom;
 
-            // Only calculate if the intersection is in the positive direction of the ray
-            if (t >= 0) {
+            if (t >= 0) { // Intersection is in the positive direction of the ray
+                List<Vector3f> linePoints = new ArrayList<>();
+                float step = t / 10; // Dividing ray into segments
+
+                for (float i = 0; i <= t; i += step) {
+                    Vector3f pointOnRay = new Vector3f(rayDirection);
+                    pointOnRay.scale(i);
+                    pointOnRay.add(rayOrigin);
+                    linePoints.add(pointOnRay);
+                }
+
+                // Optionally add the exact intersection point if needed:
                 Vector3f intersectionPoint = new Vector3f(rayDirection);
                 intersectionPoint.scale(t);
                 intersectionPoint.add(rayOrigin);
-                return intersectionPoint; // Return point on the plane
+                linePoints.add(intersectionPoint);
+
+                return linePoints;
             }
         }
 
-        // If there's no intersection, return null or a fallback point
         return null;
     }
 
