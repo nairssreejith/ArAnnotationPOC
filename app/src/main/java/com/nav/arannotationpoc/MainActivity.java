@@ -5,7 +5,8 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
+import android.media.projection.MediaProjection;
+import android.media.projection.MediaProjectionManager;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
@@ -17,15 +18,15 @@ import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.snackbar.Snackbar;
@@ -46,6 +47,8 @@ import com.nav.arannotationpoc.common.helpers.AppSettings;
 import com.nav.arannotationpoc.common.helpers.BiquadFilter;
 import com.nav.arannotationpoc.common.helpers.CameraPermissionHelper;
 import com.nav.arannotationpoc.common.helpers.DisplayRotationHelper;
+import com.nav.arannotationpoc.common.helpers.ScreenRecordService;
+import com.nav.arannotationpoc.common.viewmodel.ScreenRecordViewModel;
 import com.nav.arannotationpoc.common.viewmodel.ScreenshotViewModel;
 import com.nav.arannotationpoc.common.rendering.BackgroundRenderer;
 import com.nav.arannotationpoc.common.rendering.LineShaderRenderer;
@@ -133,6 +136,15 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
     private boolean bInstallRequested;
 
     private TrackingState mState;
+
+
+    private static final int REQUEST_CODE_MEDIA_PROJECTION = 1000;
+    private MediaProjectionManager mediaProjectionManager;
+    private Intent mediaProjectionData;
+    private int mediaProjectionResultCode = -1;
+    private ScreenRecordViewModel viewModel;
+    private DisplayMetrics displayMetrics;
+
     /**
      * Setup the app when main activity is created
      */
@@ -145,6 +157,23 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
 
         mSurfaceView = findViewById(R.id.surfaceView);
         mButtonBar = findViewById(R.id.button_bar);
+
+        mediaProjectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+        viewModel = new ViewModelProvider(this).get(ScreenRecordViewModel.class);
+
+        ImageButton btnRecord = findViewById(R.id.recordButton);
+        viewModel.getIsRecording().observe(this, isRecording -> {
+            if (isRecording) {
+                btnRecord.setImageResource(R.drawable.baseline_stop_circle_24);
+                startMediaProjectionRequest();
+            } else {
+                btnRecord.setImageResource(R.drawable.baseline_video_camera_24);
+                stopScreenRecording();
+            }
+        });
+        btnRecord.setOnClickListener(v -> viewModel.toggleRecordingState());
+
+        displayMetrics = getResources().getDisplayMetrics();
 
         /*mLineDistanceScaleBar.setProgress(sharedPref.getInt("mLineDistanceScale", 1));
         mLineWidthBar.setProgress(sharedPref.getInt("mLineWidth", 10));
@@ -222,6 +251,7 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
         screenshotViewModel.getSaveStatusLiveData().observe(this, status -> {
             Toast.makeText(this, status, Toast.LENGTH_SHORT).show();
         });
+
 
     }
 
@@ -384,11 +414,11 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
 
         mPaused = false;
 
-
-        DisplayMetrics displayMetrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
         mScreenHeight = displayMetrics.heightPixels;
         mScreenWidth = displayMetrics.widthPixels;
+
+        stopScreenRecording();
     }
 
     @Override
@@ -695,10 +725,9 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
 
 
     /**
-     * onClickRecenter handles the touch input on the GUI and sets the AtomicBoolean bReCEnterView to be true
-     * the actual recenter functionality is executed on the GL Thread
+     * onClickPreview function opens the ImagePreviewActivity for previewing all the saved screenshots
      */
-    public void onClickRecenter(View button) {
+    public void onClickPreview(View button) {
 
         Intent intent = new Intent(MainActivity.this, ImagePreviewActivity.class);
 
@@ -707,6 +736,40 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
 
         // Start the ImagePreviewActivity
         startActivity(intent);
+    }
+
+    private void startMediaProjectionRequest() {
+        Intent captureIntent = mediaProjectionManager.createScreenCaptureIntent();
+        Log.d("TRACK_RECORD", "Hitting startMediaProjectionRequest.");
+        startActivityForResult(captureIntent, REQUEST_CODE_MEDIA_PROJECTION);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_CODE_MEDIA_PROJECTION && resultCode == Activity.RESULT_OK && data != null) {
+            mediaProjectionResultCode = resultCode;
+            mediaProjectionData = data;
+            Log.d("TRACK_RECORD", "Hitting onActivityResult with result code:: " + resultCode);
+            startScreenRecording();
+        }
+    }
+
+    private void startScreenRecording() {
+        Intent serviceIntent = new Intent(this, ScreenRecordService.class);
+        serviceIntent.putExtra("RESULT_CODE", mediaProjectionResultCode);
+        serviceIntent.putExtra("DATA_INTENT", mediaProjectionData);
+
+        Log.d("TRACK_RECORD", "Hitting startScreenRecording.");
+
+        startForegroundService(serviceIntent); // Start the foreground service
+    }
+
+    private void stopScreenRecording() {
+        Intent serviceIntent = new Intent(this, ScreenRecordService.class);
+        Log.d("TRACK_RECORD", "Hitting stopScreenRecording.");
+        stopService(serviceIntent); // Stop the foreground service
     }
 
 
