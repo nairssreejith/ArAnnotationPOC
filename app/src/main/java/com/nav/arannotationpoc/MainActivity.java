@@ -3,6 +3,7 @@ package com.nav.arannotationpoc;
 import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.opengl.GLES20;
@@ -698,7 +699,14 @@ public class MainActivity extends AppCompatActivity implements GLSurfaceView.Ren
      * the actual recenter functionality is executed on the GL Thread
      */
     public void onClickRecenter(View button) {
-        bReCenterView.set(true);
+
+        Intent intent = new Intent(MainActivity.this, ImagePreviewActivity.class);
+
+        // Pass any necessary data to the ImagePreviewActivity if required
+        //intent.putExtra("key", "value"); // Replace "key" and "value" with actual data if needed
+
+        // Start the ImagePreviewActivity
+        startActivity(intent);
     }
 
 

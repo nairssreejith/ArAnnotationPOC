@@ -50,6 +50,7 @@ dependencies {
     implementation libs.obj
 
     implementation libs.vecmath
+    implementation libs.recyclerview
 
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit

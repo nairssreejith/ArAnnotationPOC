@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AR Annotation POC</string>
+    <string name="smallimage">SmallImage</string>
 </resources>
