@@ -11,6 +11,8 @@ import android.widget.ImageView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.nav.arannotationpoc.R;
 
 import java.io.File;
@@ -44,9 +46,12 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ImageViewHol
     public void onBindViewHolder(@NonNull ImageViewHolder holder, int position) {
         File imageFile = imageFiles.get(position);
 
-        // Load and set the thumbnail
-        Bitmap bitmap = BitmapFactory.decodeFile(imageFile.getAbsolutePath());
-        holder.imageView.setImageBitmap(bitmap);
+        Glide.with(context)
+                .load(imageFile)
+                .diskCacheStrategy(DiskCacheStrategy.ALL) // Cache for faster subsequent loads
+                .placeholder(R.drawable.image_preview_placeholder) // Optional: Show a placeholder while loading
+                .error(R.drawable.image_preview_error) // Optional: Show an error image if loading fails
+                .into(holder.imageView);
 
         // Highlight selected image
         if (selectedPosition == position) {

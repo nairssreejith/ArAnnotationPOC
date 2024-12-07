@@ -51,6 +51,7 @@ dependencies {
 
     implementation libs.vecmath
     implementation libs.recyclerview
+    implementation libs.glide
 
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit

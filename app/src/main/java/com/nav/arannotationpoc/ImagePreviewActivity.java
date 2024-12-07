@@ -1,7 +1,5 @@
 package com.nav.arannotationpoc;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Environment;
 import android.widget.ImageView;
@@ -11,19 +9,22 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
 import com.nav.arannotationpoc.common.adapter.ImageAdapter;
+import com.nav.arannotationpoc.common.viewmodel.ImagePreviewViewModel;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
 
 public class ImagePreviewActivity extends AppCompatActivity {
 
     private ImageView fullScreenImageView;
     private RecyclerView imageRecyclerView;
+    private ImageAdapter adapter;
+    private ImagePreviewViewModel viewModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,38 +40,39 @@ public class ImagePreviewActivity extends AppCompatActivity {
         fullScreenImageView = findViewById(R.id.fullScreenImageView);
         imageRecyclerView = findViewById(R.id.imageRecyclerView);
 
-        // Load images from local folder
-        List<File> imageFiles = loadImagesFromFolder(new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES), "Screenshots"));
+        // Initialize ViewModel
+        viewModel = new ViewModelProvider(this).get(ImagePreviewViewModel.class);
 
-        if (imageFiles.isEmpty()) return; // Handle no images case
+        // Observe the images list from ViewModel
+        viewModel.getImagesList().observe(this, imageFiles -> {
+            if (imageFiles != null && !imageFiles.isEmpty()) {
+                // Initialize RecyclerView Adapter
+                adapter = new ImageAdapter(this, imageFiles, this::previewImage);
+                imageRecyclerView.setAdapter(adapter);
 
-        // Set default preview
-        previewImage(imageFiles.get(0), 0);
-
-        // Set up RecyclerView
-        ImageAdapter adapter = new ImageAdapter(this, imageFiles, this::previewImage);
-        imageRecyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
-        imageRecyclerView.setAdapter(adapter);
-    }
-
-    private void previewImage(File imageFile, int i) {
-        Bitmap bitmap = BitmapFactory.decodeFile(imageFile.getAbsolutePath());
-        fullScreenImageView.setImageBitmap(bitmap);
-    }
-
-    private List<File> loadImagesFromFolder(File folder) {
-        List<File> imageFiles = new ArrayList<>();
-        if (folder.exists() && folder.isDirectory()) {
-            File[] files = folder.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    if (file.getName().endsWith(".jpg") || file.getName().endsWith(".png")) {
-                        imageFiles.add(file);
-                    }
-                }
+                // Preview the first image by default
+                previewImage(imageFiles.get(0), 0);
             }
+        });
+
+        // Load images from folder
+        File imageFolder = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Screenshots");
+        viewModel.loadImages(imageFolder);
+
+        setupRecyclerView();
+    }
+
+    private void setupRecyclerView() {
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false);
+        imageRecyclerView.setLayoutManager(layoutManager);
+    }
+
+    private void previewImage(File imageFile, int position) {
+        if (imageFile.exists()) {
+            Glide.with(this)
+                    .load(imageFile)
+                    .error(R.drawable.image_preview_error)
+                    .into(fullScreenImageView);
         }
-        return imageFiles;
     }
 }
